@@ -962,10 +962,22 @@ void node_toon_light_evaluation_impl(
   LightVector lv = light_vector_get(light, is_directional, position);
 
   direction = lv.L;
-  /* `shape_power` is radiance and expects an LTC solid-angle factor. Using it as a toon
-   * irradiance term over-brightens small suns and spheres (the ramp then clips to white).
-   * `point_power` is intensity/irradiance; `light_point_light` restores distance falloff. */
-  radiance = light.color * light.point_power * light_point_light(light, is_directional, lv) *
+
+  /* Evaluate the light as a fully facing receiver so the ramp replaces N·L.
+   * Using `shape_power` without the LTC solid-angle term over-brightens small suns
+   * (default 0.526° is ~15000×); Material Preview's HDRI sun is much larger so it
+   * looked fine while Rendered scene suns clipped to white. */
+  [[resource_table]] UtilityTexture &util_tx = resource_table_get(UtilityTexture);
+  LightVertices vertices = light_shape_corners(light, lv);
+  const ViewMatrices view = view_matrices_get();
+  const float3 V = view.world_incident_vector(position);
+  const float3 N_facing = lv.L;
+  eevee::LTCData ltc_data = eevee::LTCData::identity(N_facing, V);
+  float3x3 T = from_incident_vector(N_facing, V);
+  ltc_data.Minv = ltc_data.Minv * transpose(T);
+  const float ltc_result = light_ltc(util_tx.utility_tx, light, ltc_data, lv, vertices);
+
+  radiance = light.color * light.shape_power * ltc_result *
              light_attenuation_surface(light, is_directional, lv);
 }
 
