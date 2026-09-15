@@ -7,6 +7,7 @@
 #include "gpu_shader_common_color_utils.bsl.hh"
 #include "gpu_shader_material_interface.bsl.hh"
 #include "gpu_shader_material_open_pbr_util.bsl.hh"
+#include "gpu_shader_material_toon_ramp_lib.bsl.hh"
 #include "gpu_shader_math_vector_safe.bsl.hh"
 #include "gpu_shader_utildefines.bsl.hh"
 
@@ -50,17 +51,25 @@ void toon_surface_diffuse_lut(float4 diffuse_color,
 [[node]]
 void node_bsdf_toon_surface_direct(float light_index,
                                    float4 diffuse_color,
+                                   float4 shadow_color,
                                    float metallic,
+                                   float roughness,
                                    float alpha,
                                    float ao,
                                    float3 N,
                                    float weight,
                                    float diffuse_warp,
+                                   float4 spec_tint,
+                                   float use_diffuse_ramp,
+                                   float use_spec_ramp,
                                    sampler2D ramp_tx,
+                                   sampler2D spec_ramp_tx,
                                    Closure &result)
 {
   const int index = int(light_index);
   N = normalize_fallback(N, g_data.N);
+  metallic = saturate(metallic);
+  const float wrap = saturate(diffuse_warp);
 
   float3 direction;
   float3 light_radiance;
@@ -69,21 +78,40 @@ void node_bsdf_toon_surface_direct(float light_index,
   float4 shadow;
   node_shadow_raycast_impl(index, g_data.P, 1.0f, shadow);
 
-  const float ramp_coordinate = saturate(mix(dot(N, direction), 1.0f, saturate(diffuse_warp)));
-  const int2 ramp_extent = max(textureSize(ramp_tx, 0).xy, int2(1));
-  const float2 ramp_uv = float2(
-      (ramp_coordinate * float(ramp_extent.x - 1) + 0.5f) / float(ramp_extent.x), 0.5f);
-  const float3 ramp = textureLod(ramp_tx, ramp_uv, 0.0f).rgb;
-  const float3 diffuse_light = max(light_radiance * shadow.rgb * ramp, float3(0.0f));
-  const float3 albedo = saturate(diffuse_color.rgb) * saturate(ao);
+  const float nl = saturate(mix(dot(N, direction), 1.0f, wrap));
+  float3 ramp_rgb = float3(nl);
+  float ramp_alpha = 1.0f;
+  if (use_diffuse_ramp > 0.5f) {
+    const float4 ramp = toon_sample_ramp(ramp_tx, nl, 0.5f);
+    ramp_rgb = ramp.rgb;
+    ramp_alpha = ramp.a;
+  }
+
+  const float3 albedo = toon_ramp_mix_albedo(
+                            diffuse_color.rgb, shadow_color.rgb, ramp_alpha, ao) *
+                        (1.0f - metallic);
+  const float3 diffuse_light = max(light_radiance * shadow.rgb * ramp_rgb, float3(0.0f));
+
+  float3 glossy_light = float3(0.0f);
+  float3 glossy_color = float3(0.0f);
+  if (use_spec_ramp > 0.5f) {
+    const float3 V = coordinate_incoming(g_data.P);
+    const float3 H = normalize_fallback(direction + V, N);
+    const float4 spec_ramp = toon_sample_ramp(
+        spec_ramp_tx, saturate(dot(N, H)), saturate(roughness));
+    glossy_light = max(light_radiance * shadow.rgb * spec_ramp.rgb, float3(0.0f));
+    glossy_color = mix(max(spec_tint.rgb, float3(0.0f)), saturate(diffuse_color.rgb), metallic) *
+                   saturate(spec_ramp.a);
+  }
+
   node_light_accumulation_impl(index,
                                diffuse_light,
                                albedo,
+                               glossy_light,
+                               glossy_color,
                                float3(0.0f),
                                float3(0.0f),
-                               float3(0.0f),
-                               float3(0.0f),
-                               weight * saturate(alpha) * (1.0f - saturate(metallic)),
+                               weight * saturate(alpha),
                                result);
 }
 
@@ -119,6 +147,7 @@ void node_bsdf_toon_surface(float4 base_color,
                             const float float_weight,
                             [[maybe_unused]] const float diffuse_warp,
                             [[maybe_unused]] const float ao,
+                            [[maybe_unused]] const float4 shadow_color,
                             [[maybe_unused]] const float diffuse_lut_influence,
                             const float specular_ior_level,
                             const float4 specular_tint,
@@ -132,6 +161,7 @@ void node_bsdf_toon_surface(float4 base_color,
                             const float3 CN,
                             const float do_multiscatter,
                             [[maybe_unused]] const float direct_weight,
+                            const float use_spec_ramp,
                             [[maybe_unused]] const float4 toon_diffuse_color,
                             Closure &result)
 {
@@ -170,9 +200,15 @@ void node_bsdf_toon_surface(float4 base_color,
   weight = openpbr_eval_transparency(weight, alpha);
   weight = openpbr_eval_fuzz(weight, coat, fuzz, N, V, fuzz_data);
   weight = openpbr_eval_coat(weight, coat, V);
-  weight = openpbr_eval_metal(
-      weight, clamped_base_color, specular, metallic, NV, multiggx, reflection_data);
-  weight = toon_surface_eval_gloss(weight, specular, N, NV, multiggx, reflection_data);
+  if (use_spec_ramp > 0.5f) {
+    /* Direct specular comes from the lighting ramp; keep metals from adding GGX on top. */
+    weight *= (1.0f - metallic);
+  }
+  else {
+    weight = openpbr_eval_metal(
+        weight, clamped_base_color, specular, metallic, NV, multiggx, reflection_data);
+    weight = toon_surface_eval_gloss(weight, specular, N, NV, multiggx, reflection_data);
+  }
 
 #ifdef MAT_DIFFUSE
   ClosureToonDiffuse diffuse_data;

@@ -990,6 +990,12 @@ static bool ntree_shader_is_light_accumulation_node(const bNode &node)
          (ntree_shader_is_toon_ramp_bsdf(node) && node.custom1 == 1);
 }
 
+static bool ntree_shader_toon_has_image(bNode &node, const char *identifier)
+{
+  const bNodeSocket *socket = ntree_shader_node_find_input(&node, identifier);
+  return socket && socket->default_value_typed<bNodeSocketValueImage>()->value;
+}
+
 static void ntree_shader_add_toon_ramp_lighting_nodes(bNodeTree *ntree)
 {
   Vector<bNode *> toon_nodes;
@@ -997,8 +1003,9 @@ static void ntree_shader_add_toon_ramp_lighting_nodes(bNodeTree *ntree)
     if (!ntree_shader_is_toon_ramp_bsdf(node) || node.custom1 != 0) {
       continue;
     }
-    const bNodeSocket *ramp_socket = ntree_shader_node_find_input(&node, "Ramp Texture");
-    if (ramp_socket && ramp_socket->default_value_typed<bNodeSocketValueImage>()->value) {
+    if (ntree_shader_toon_has_image(node, "Ramp Texture") ||
+        ntree_shader_toon_has_image(node, "Ramp Specular"))
+    {
       toon_nodes.append(&node);
     }
   }

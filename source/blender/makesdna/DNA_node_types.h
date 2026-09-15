@@ -2781,12 +2781,13 @@ struct NodeShaderHairPrincipled {
   char _pad[4] = {};
 };
 
-/** Runtime image state for the Toon Surface ramp and flattened 3D diffuse LUT. */
+/** Runtime image state for the Toon Surface ramps and flattened 3D diffuse LUT. */
 struct NodeShaderToonSurface {
   DNA_DEFINE_CXX_METHODS(NodeShaderToonSurface)
 
   ImageUser ramp_iuser;
   ImageUser diffuse_lut_iuser;
+  ImageUser spec_ramp_iuser;
 };
 
 /** Runtime image state for the Toon Skin ramp and flattened 3D skin LUT. */

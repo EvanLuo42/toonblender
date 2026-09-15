@@ -81,6 +81,10 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .description("Ambient occlusion applied to the diffuse component");
 #define TOON_SURFACE_SOCK_AO_ID 8
+  diffuse.add_input<decl::Color>("Shadow Color"_ustr)
+      .default_value({0.0f, 0.0f, 0.0f, 1.0f})
+      .description("Albedo used where the diffuse ramp alpha is 0");
+#define TOON_SURFACE_SOCK_SHADOW_COLOR_ID 9
   diffuse.add_input<decl::Float>("Diffuse LUT Influence"_ustr)
       .default_value(1.0f)
       .min(0.0f)
@@ -88,13 +92,15 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("LUT Influence"_ustr)
       .description("Blend between the diffuse color and the color transformed by Diffuse LUT");
-#define TOON_SURFACE_SOCK_DIFFUSE_LUT_INFLUENCE_ID 9
+#define TOON_SURFACE_SOCK_DIFFUSE_LUT_INFLUENCE_ID 10
   diffuse.add_input<decl::Image>("Ramp Texture"_ustr)
-      .description("Horizontal lighting ramp sampled using the warped normal-light angle");
-#define TOON_SURFACE_SOCK_RAMP_TEXTURE_ID 10
+      .description(
+          "Diffuse lighting ramp. RGB tints the light; alpha blends Shadow Color (0) with Base "
+          "Color (1)");
+#define TOON_SURFACE_SOCK_RAMP_TEXTURE_ID 11
   diffuse.add_input<decl::Image>("Diffuse LUT"_ustr)
       .description("Flattened 3D color LUT with dimensions N squared by N");
-#define TOON_SURFACE_SOCK_DIFFUSE_LUT_ID 11
+#define TOON_SURFACE_SOCK_DIFFUSE_LUT_ID 12
 
   PanelDeclarationBuilder &specular = b.add_panel("Specular"_ustr).default_closed(true);
   specular.add_input<decl::Float>("Specular IOR Level"_ustr)
@@ -104,12 +110,17 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("IOR Level"_ustr)
       .description("Adjust the intensity of dielectric GGX reflection");
-#define TOON_SURFACE_SOCK_SPECULAR_ID 12
+#define TOON_SURFACE_SOCK_SPECULAR_ID 13
   specular.add_input<decl::Color>("Specular Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
-      .description("Tint the GGX specular reflection");
-#define TOON_SURFACE_SOCK_SPECULAR_TINT_ID 13
+      .description("Tint the GGX or ramp specular reflection");
+#define TOON_SURFACE_SOCK_SPECULAR_TINT_ID 14
+  specular.add_input<decl::Image>("Ramp Specular"_ustr)
+      .description(
+          "Optional specular ramp sampled by the half-angle (U) and roughness (V). Leave empty "
+          "to use GGX");
+#define TOON_SURFACE_SOCK_RAMP_SPECULAR_ID 15
 
   PanelDeclarationBuilder &sheen = b.add_panel("Fibre / Sheen"_ustr).default_closed(true);
   sheen.add_input<decl::Float>("Sheen Weight"_ustr)
@@ -119,7 +130,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the microfiber sheen layer");
-#define TOON_SURFACE_SOCK_SHEEN_WEIGHT_ID 14
+#define TOON_SURFACE_SOCK_SHEEN_WEIGHT_ID 16
   sheen.add_input<decl::Float>("Sheen Roughness"_ustr)
       .default_value(0.5f)
       .min(0.0f)
@@ -127,12 +138,12 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Roughness"_ustr)
       .description("Roughness of the microfiber sheen layer");
-#define TOON_SURFACE_SOCK_SHEEN_ROUGHNESS_ID 15
+#define TOON_SURFACE_SOCK_SHEEN_ROUGHNESS_ID 17
   sheen.add_input<decl::Color>("Sheen Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Color of the microfiber sheen reflection");
-#define TOON_SURFACE_SOCK_SHEEN_TINT_ID 16
+#define TOON_SURFACE_SOCK_SHEEN_TINT_ID 18
 
   PanelDeclarationBuilder &coat = b.add_panel("Coat"_ustr).default_closed(true);
   coat.add_input<decl::Float>("Coat Weight"_ustr)
@@ -142,7 +153,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the dielectric coat layer");
-#define TOON_SURFACE_SOCK_COAT_WEIGHT_ID 17
+#define TOON_SURFACE_SOCK_COAT_WEIGHT_ID 19
   coat.add_input<decl::Float>("Coat Roughness"_ustr)
       .default_value(0.03f)
       .min(0.0f)
@@ -150,24 +161,24 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Roughness"_ustr)
       .description("Roughness of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_ROUGHNESS_ID 18
+#define TOON_SURFACE_SOCK_COAT_ROUGHNESS_ID 20
   coat.add_input<decl::Float>("Coat IOR"_ustr)
       .default_value(1.5f)
       .min(1.0f)
       .max(4.0f)
       .short_label("IOR"_ustr)
       .description("Index of refraction of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_IOR_ID 19
+#define TOON_SURFACE_SOCK_COAT_IOR_ID 21
   coat.add_input<decl::Color>("Coat Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Absorption tint of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_TINT_ID 20
+#define TOON_SURFACE_SOCK_COAT_TINT_ID 22
   coat.add_input<decl::Vector>("Coat Normal"_ustr).short_label("Normal"_ustr).hide_value();
-#define TOON_SURFACE_SOCK_COAT_NORMAL_ID 21
+#define TOON_SURFACE_SOCK_COAT_NORMAL_ID 23
 
   b.add_input<decl::Int>("LightIndex"_ustr).available(is_gpu_internal);
-#define TOON_SURFACE_SOCK_LIGHT_INDEX_ID 22
+#define TOON_SURFACE_SOCK_LIGHT_INDEX_ID 24
 }
 
 static void node_shader_init_toon_surface(bNodeTree * /*ntree*/, bNode *node)
@@ -175,6 +186,7 @@ static void node_shader_init_toon_surface(bNodeTree * /*ntree*/, bNode *node)
   NodeShaderToonSurface *storage = MEM_new<NodeShaderToonSurface>(__func__);
   BKE_imageuser_default(&storage->ramp_iuser);
   BKE_imageuser_default(&storage->diffuse_lut_iuser);
+  BKE_imageuser_default(&storage->spec_ramp_iuser);
   node->storage = storage;
   node->custom1 = TOON_SURFACE_MODE_CLOSURE;
 }
@@ -204,6 +216,7 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
 
   Image *ramp_image = image_from_socket(*node, "Ramp Texture"_ustr);
   Image *diffuse_lut_image = image_from_socket(*node, "Diffuse LUT"_ustr);
+  Image *spec_ramp_image = image_from_socket(*node, "Ramp Specular"_ustr);
 
   if (!in[TOON_SURFACE_SOCK_NORMAL_ID].link) {
     GPU_link(mat, "world_normals_get", &in[TOON_SURFACE_SOCK_NORMAL_ID].link);
@@ -237,24 +250,42 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
   }
 
   if (node->custom1 == TOON_SURFACE_MODE_DIRECT_LIGHT) {
-    if (!ramp_image) {
+    if (!ramp_image && !spec_ramp_image) {
       return false;
     }
 
-    GPU_material_flag_set(mat, GPU_MATFLAG_LIGHTING | GPU_MATFLAG_DIFFUSE);
-    GPUNodeLink *ramp_texture = GPU_image(
-        mat, ramp_image, &storage_original->ramp_iuser, lookup_sampler);
+    eGPUMaterialFlag lighting_flag = GPU_MATFLAG_LIGHTING | GPU_MATFLAG_DIFFUSE;
+    if (spec_ramp_image) {
+      lighting_flag |= GPU_MATFLAG_GLOSSY;
+    }
+    GPU_material_flag_set(mat, lighting_flag);
+
+    Image *diffuse_bind = ramp_image ? ramp_image : spec_ramp_image;
+    Image *spec_bind = spec_ramp_image ? spec_ramp_image : ramp_image;
+    ImageUser *diffuse_iuser = ramp_image ? &storage_original->ramp_iuser :
+                                            &storage_original->spec_ramp_iuser;
+    ImageUser *spec_iuser = spec_ramp_image ? &storage_original->spec_ramp_iuser :
+                                              &storage_original->ramp_iuser;
+    const float use_diffuse_ramp = ramp_image ? 1.0f : 0.0f;
+    const float use_spec_ramp = spec_ramp_image ? 1.0f : 0.0f;
+
     return GPU_link(mat,
                     "node_bsdf_toon_surface_direct",
                     ensure_link(in[TOON_SURFACE_SOCK_LIGHT_INDEX_ID]),
                     diffuse_color,
+                    ensure_link(in[TOON_SURFACE_SOCK_SHADOW_COLOR_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_METALLIC_ID]),
+                    ensure_link(in[TOON_SURFACE_SOCK_ROUGHNESS_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_ALPHA_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_AO_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_NORMAL_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_WEIGHT_ID]),
                     ensure_link(in[TOON_SURFACE_SOCK_DIFFUSE_WARP_ID]),
-                    ramp_texture,
+                    ensure_link(in[TOON_SURFACE_SOCK_SPECULAR_TINT_ID]),
+                    GPU_constant(&use_diffuse_ramp),
+                    GPU_constant(&use_spec_ramp),
+                    GPU_image(mat, diffuse_bind, diffuse_iuser, lookup_sampler),
+                    GPU_image(mat, spec_bind, spec_iuser, lookup_sampler),
                     &out[0].link);
   }
 
@@ -287,7 +318,7 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
 
   /* LightIndex is only used by the direct-light GPU function. Leaving it on the stack would
    * make GPU_stack_link() pass it as a node_bsdf_toon_surface argument and shift the extra
-   * parameters (multiscatter, direct weight, precomputed diffuse color). */
+   * parameters (multiscatter, direct weight, spec ramp flag, precomputed diffuse color). */
   for (int i = 0; !in[i].end; i++) {
     if (i == TOON_SURFACE_SOCK_LIGHT_INDEX_ID) {
       in[i].type = GPU_NONE;
@@ -296,7 +327,8 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
   }
 
   const float use_multiscatter = 1.0f;
-  const float direct_weight = ramp_image ? 0.0f : 1.0f;
+  const float direct_weight = (ramp_image || spec_ramp_image) ? 0.0f : 1.0f;
+  const float use_spec_ramp = spec_ramp_image ? 1.0f : 0.0f;
   return GPU_stack_link(mat,
                         node,
                         "node_bsdf_toon_surface",
@@ -304,6 +336,7 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
                         out,
                         GPU_constant(&use_multiscatter),
                         GPU_constant(&direct_weight),
+                        GPU_constant(&use_spec_ramp),
                         diffuse_color);
 }
 
@@ -318,8 +351,8 @@ void register_node_type_sh_bsdf_toon_surface()
   sh_node_type_base(&ntype, "ShaderNodeBsdfToonSurface"_ustr, SH_NODE_BSDF_TOON_SURFACE);
   ntype.ui_name = "Toon Surface BSDF";
   ntype.ui_description =
-      "Eevee surface shader combining Half-Lambert diffuse with GGX specular, microfiber sheen, "
-      "and coat layers";
+      "Eevee surface shader combining ramp or Half-Lambert diffuse with optional ramp or GGX "
+      "specular, microfiber sheen, and coat layers";
   ntype.enum_name_legacy = "BSDF_TOON_SURFACE";
   ntype.nclass = NODE_CLASS_SHADER;
   ntype.declare = file_ns::node_declare;

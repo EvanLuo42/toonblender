@@ -66,14 +66,41 @@ static void node_declare(NodeDeclarationBuilder &b)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR)
-      .description("Blend between the diffuse color and the color transformed by Skin LUT");
+      .description(
+          "Blend between the base color and the Skin LUT result when forming the shadow color");
 #define TOON_SKIN_SOCK_LUT_INFLUENCE_ID 6
+  diffuse.add_input<decl::Float>("Dark Strength"_ustr)
+      .default_value(1.0f)
+      .min(0.0f)
+      .max(2.0f)
+      .description("Scales the LUT shadow color; 1 keeps the LUT result");
+#define TOON_SKIN_SOCK_DARK_STRENGTH_ID 7
+  diffuse.add_input<decl::Float>("Inner Dark"_ustr)
+      .default_value(0.65f)
+      .min(0.0f)
+      .max(1.0f)
+      .subtype(PROP_FACTOR)
+      .short_label("Inner"_ustr)
+      .description("Multiplier on the shadow color used in the deepest shade");
+#define TOON_SKIN_SOCK_INNER_DARK_ID 8
+  diffuse.add_input<decl::Float>("Inner Threshold"_ustr)
+      .default_value(0.25f)
+      .min(0.0f)
+      .max(1.0f)
+      .subtype(PROP_FACTOR)
+      .short_label("Threshold"_ustr)
+      .description(
+          "Warped lighting value below which Inner Dark is mixed in; 0 disables inner dark");
+#define TOON_SKIN_SOCK_INNER_THRESHOLD_ID 9
   diffuse.add_input<decl::Image>("Ramp Texture"_ustr)
-      .description("Horizontal lighting ramp sampled using the warped normal-light angle");
-#define TOON_SKIN_SOCK_RAMP_TEXTURE_ID 7
+      .description(
+          "Skin lighting ramp; luminance selects lit versus shadow albedo, RGB tints the light");
+#define TOON_SKIN_SOCK_RAMP_TEXTURE_ID 10
   diffuse.add_input<decl::Image>("Skin LUT"_ustr)
-      .description("Flattened 3D skin color LUT with dimensions N squared by N");
-#define TOON_SKIN_SOCK_SKIN_LUT_ID 8
+      .description(
+          "Flattened 3D skin color LUT with dimensions N squared by N; sampled as the shadow "
+          "color");
+#define TOON_SKIN_SOCK_SKIN_LUT_ID 11
 
   PanelDeclarationBuilder &rim = b.add_panel("Rim"_ustr).default_closed(true);
   rim.add_input<decl::Float>("Rim Weight"_ustr)
@@ -83,22 +110,22 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the view-facing rim light");
-#define TOON_SKIN_SOCK_RIM_WEIGHT_ID 9
+#define TOON_SKIN_SOCK_RIM_WEIGHT_ID 12
   rim.add_input<decl::Color>("Rim Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Color of the rim light");
-#define TOON_SKIN_SOCK_RIM_TINT_ID 10
+#define TOON_SKIN_SOCK_RIM_TINT_ID 13
   rim.add_input<decl::Float>("Rim Exponent"_ustr)
       .default_value(5.0f)
       .min(0.0f)
       .max(20.0f)
       .short_label("Exponent"_ustr)
       .description("Tightness of the rim; higher values confine the rim to glancing angles");
-#define TOON_SKIN_SOCK_RIM_EXPONENT_ID 11
+#define TOON_SKIN_SOCK_RIM_EXPONENT_ID 14
 
   b.add_input<decl::Int>("LightIndex"_ustr).available(is_gpu_internal);
-#define TOON_SKIN_SOCK_LIGHT_INDEX_ID 12
+#define TOON_SKIN_SOCK_LIGHT_INDEX_ID 15
 }
 
 static void node_shader_init_toon_skin(bNodeTree * /*ntree*/, bNode *node)
@@ -145,24 +172,39 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
   lookup_sampler.extend_x = GPU_SAMPLER_EXTEND_MODE_EXTEND;
   lookup_sampler.extend_yz = GPU_SAMPLER_EXTEND_MODE_EXTEND;
 
-  GPUNodeLink *diffuse_color = ensure_link(in[TOON_SKIN_SOCK_BASE_COLOR_ID]);
-
-  if (skin_lut_image) {
-    GPUNodeLink *lut_color = nullptr;
-    if (!GPU_link(mat,
-                  "toon_surface_diffuse_lut",
-                  diffuse_color,
-                  ensure_link(in[TOON_SKIN_SOCK_LUT_INFLUENCE_ID]),
-                  GPU_image(mat, skin_lut_image, &storage_original->skin_lut_iuser, lookup_sampler),
-                  &lut_color))
-    {
-      return false;
-    }
-    diffuse_color = lut_color;
-  }
-
   if (node->custom1 == TOON_SKIN_MODE_DIRECT_LIGHT) {
     if (!ramp_image) {
+      return false;
+    }
+
+    GPUNodeLink *dark_color = nullptr;
+    if (skin_lut_image) {
+      GPUNodeLink *lut_color = nullptr;
+      if (!GPU_link(mat,
+                    "toon_surface_diffuse_lut",
+                    ensure_link(in[TOON_SKIN_SOCK_BASE_COLOR_ID]),
+                    ensure_link(in[TOON_SKIN_SOCK_LUT_INFLUENCE_ID]),
+                    GPU_image(
+                        mat, skin_lut_image, &storage_original->skin_lut_iuser, lookup_sampler),
+                    &lut_color))
+      {
+        return false;
+      }
+      if (!GPU_link(mat,
+                    "toon_skin_scale_color",
+                    lut_color,
+                    ensure_link(in[TOON_SKIN_SOCK_DARK_STRENGTH_ID]),
+                    &dark_color))
+      {
+        return false;
+      }
+    }
+    else if (!GPU_link(mat,
+                       "toon_skin_scale_color",
+                       ensure_link(in[TOON_SKIN_SOCK_BASE_COLOR_ID]),
+                       ensure_link(in[TOON_SKIN_SOCK_DARK_STRENGTH_ID]),
+                       &dark_color))
+    {
       return false;
     }
 
@@ -172,7 +214,10 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
     return GPU_link(mat,
                     "node_bsdf_toon_skin_direct",
                     ensure_link(in[TOON_SKIN_SOCK_LIGHT_INDEX_ID]),
-                    diffuse_color,
+                    ensure_link(in[TOON_SKIN_SOCK_BASE_COLOR_ID]),
+                    dark_color,
+                    ensure_link(in[TOON_SKIN_SOCK_INNER_DARK_ID]),
+                    ensure_link(in[TOON_SKIN_SOCK_INNER_THRESHOLD_ID]),
                     ensure_link(in[TOON_SKIN_SOCK_ALPHA_ID]),
                     ensure_link(in[TOON_SKIN_SOCK_AO_ID]),
                     ensure_link(in[TOON_SKIN_SOCK_NORMAL_ID]),
@@ -201,7 +246,7 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
 
   /* LightIndex is only used by the direct-light GPU function. Leaving it on the stack would
    * make GPU_stack_link() pass it as a node_bsdf_toon_skin argument and shift the extra
-   * parameters (direct weight, precomputed diffuse color). */
+   * parameter (direct weight). */
   for (int i = 0; !in[i].end; i++) {
     if (i == TOON_SKIN_SOCK_LIGHT_INDEX_ID) {
       in[i].type = GPU_NONE;
@@ -210,13 +255,7 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
   }
 
   const float direct_weight = ramp_image ? 0.0f : 1.0f;
-  return GPU_stack_link(mat,
-                        node,
-                        "node_bsdf_toon_skin",
-                        in,
-                        out,
-                        GPU_constant(&direct_weight),
-                        diffuse_color);
+  return GPU_stack_link(mat, node, "node_bsdf_toon_skin", in, out, GPU_constant(&direct_weight));
 }
 
 }  // namespace nodes::node_shader_bsdf_toon_skin_cc
@@ -230,7 +269,8 @@ void register_node_type_sh_bsdf_toon_skin()
   sh_node_type_base(&ntype, "ShaderNodeBsdfToonSkin"_ustr, SH_NODE_BSDF_TOON_SKIN);
   ntype.ui_name = "Toon Skin BSDF";
   ntype.ui_description =
-      "Eevee toon skin shader using ramp lighting and a skin color LUT, without PBR layers";
+      "Eevee toon skin shader using ramp lighting, a LUT shadow color, and inner dark, without "
+      "PBR layers";
   ntype.enum_name_legacy = "BSDF_TOON_SKIN";
   ntype.nclass = NODE_CLASS_SHADER;
   ntype.declare = file_ns::node_declare;
