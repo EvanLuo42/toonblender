@@ -7,6 +7,7 @@
  */
 
 #include "node_shader_util.hh"
+#include "node_util.hh"
 
 #include "BKE_image.hh"
 #include "BKE_node_runtime.hh"
@@ -108,7 +109,9 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(
           "Shifts the primary highlight along the strand; negative moves it toward the root");
 #define TOON_HAIR_SOCK_SPEC_SHIFT_ID 12
-  specular.add_input<decl::Float>("Secondary Weight"_ustr)
+
+  PanelDeclarationBuilder &secondary = b.add_panel("Secondary"_ustr).default_closed(false);
+  secondary.add_input<decl::Float>("Secondary Weight"_ustr)
       .default_value(0.5f)
       .min(0.0f)
       .max(1.0f)
@@ -116,12 +119,12 @@ static void node_declare(NodeDeclarationBuilder &b)
       .short_label("Weight"_ustr)
       .description("Intensity of the secondary Kajiya-Kay highlight");
 #define TOON_HAIR_SOCK_SECONDARY_WEIGHT_ID 13
-  specular.add_input<decl::Color>("Secondary Tint"_ustr)
+  secondary.add_input<decl::Color>("Secondary Tint"_ustr)
       .default_value({1.0f, 0.8f, 0.6f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Color of the secondary highlight");
 #define TOON_HAIR_SOCK_SECONDARY_TINT_ID 14
-  specular.add_input<decl::Float>("Secondary Shift"_ustr)
+  secondary.add_input<decl::Float>("Secondary Shift"_ustr)
       .default_value(0.2f)
       .min(-1.0f)
       .max(1.0f)
@@ -129,26 +132,31 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(
           "Shifts the secondary highlight along the strand; positive moves it toward the tip");
 #define TOON_HAIR_SOCK_SECONDARY_SHIFT_ID 15
-  specular.add_input<decl::Float>("Secondary Roughness"_ustr)
+  secondary.add_input<decl::Float>("Secondary Roughness"_ustr)
       .default_value(0.6f)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR)
       .short_label("Roughness"_ustr)
-      .description("Roughness of the secondary highlight");
+      .description(
+          "Width of the secondary highlight. Independent of the primary Roughness used for "
+          "Ramp Specular V");
 #define TOON_HAIR_SOCK_SECONDARY_ROUGHNESS_ID 16
-  specular.add_input<decl::Float>("Shift"_ustr)
+
+  specular.add_input<decl::Float>("Shift Map"_ustr)
       .default_value(0.5f)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR)
+      .short_label("ST"_ustr)
       .description(
-          "Per-pixel tangent shift; connect the ST shift texture. 0.5 adds no extra shift");
+          "Per-pixel tangent shift from the ST texture. 0.5 adds no extra shift. Added to both "
+          "specular lobes");
 #define TOON_HAIR_SOCK_SHIFT_ID 17
   specular.add_input<decl::Image>("Ramp Specular"_ustr)
       .description(
-          "Optional Kajiya-Kay specular ramp sampled by sin(T, H) on U and roughness on V. "
-          "Leave empty to use an analytical highlight");
+          "Optional Kajiya-Kay specular ramp sampled by sin(T, H) on U and primary Roughness "
+          "on V. Leave empty to use an analytical highlight");
 #define TOON_HAIR_SOCK_RAMP_SPECULAR_ID 18
 
   PanelDeclarationBuilder &rim = b.add_panel("Rim"_ustr).default_closed(true);
@@ -278,12 +286,14 @@ static int node_shader_gpu_bsdf_toon_hair(GPUMaterial *mat,
 
   const bool use_transparency = in[TOON_HAIR_SOCK_ALPHA_ID].socket_not_one();
   const bool use_rim = in[TOON_HAIR_SOCK_RIM_WEIGHT_ID].socket_not_zero();
+  const bool use_spec = in[TOON_HAIR_SOCK_SPEC_WEIGHT_ID].socket_not_zero() ||
+                        in[TOON_HAIR_SOCK_SECONDARY_WEIGHT_ID].socket_not_zero();
 
   eGPUMaterialFlag flag = GPU_MATFLAG_DIFFUSE;
   if (use_transparency) {
     flag |= GPU_MATFLAG_TRANSPARENT;
   }
-  if (use_rim) {
+  if (use_rim || use_spec) {
     flag |= GPU_MATFLAG_EMISSION;
   }
 

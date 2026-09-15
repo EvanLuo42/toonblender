@@ -53,3 +53,30 @@ float3 toon_skin_mix_albedo(const float3 lit_color,
   const float inner_mask = (t <= 1.0e-5f) ? 1.0f : saturate(nl / t);
   return mix(inner, first_shadow, inner_mask) * saturate(ao);
 }
+
+float3 toon_skin_sss_radius(const float3 radius, const float scale)
+{
+  return max(radius * max(scale, 0.0f), float3(0.0f));
+}
+
+float3 toon_skin_sss_tint(const float3 radius)
+{
+  const float3 positive = max(radius, float3(0.0f));
+  const float peak = max(max(positive.r, positive.g), positive.b);
+  return (peak > 1.0e-5f) ? (positive / peak) : float3(1.0f);
+}
+
+float toon_skin_sss_wrap(const float sss_weight, const float sss_scale)
+{
+  /* Scale is a world-space radius; a few centimeters add a small extra wrap. */
+  return saturate(sss_weight) * saturate(sss_scale * 2.0f);
+}
+
+float3 toon_skin_sss_albedo(const float3 albedo,
+                            const float3 sss_tint,
+                            const float sss_weight,
+                            const float shade)
+{
+  /* Chromatic scatter in the unlit region, matching the red terminator of skin. */
+  return mix(albedo, albedo * sss_tint, saturate(sss_weight) * (1.0f - saturate(shade)));
+}

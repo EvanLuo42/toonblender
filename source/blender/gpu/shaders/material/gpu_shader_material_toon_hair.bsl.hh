@@ -17,7 +17,10 @@ float3 toon_hair_tangent(const float3 T, const float3 N)
   const float3 world_up = float3(0.0f, 0.0f, 1.0f);
   const float3 generated = cross(
       N, normalize_fallback(cross(world_up, N), float3(1.0f, 0.0f, 0.0f)));
-  const float3 tangent = normalize_fallback(T, generated);
+  /* HN run through a Normal Map node is almost parallel to N, which zeros the
+   * gram-schmidt and kills Kajiya-Kay. Treat that as "no tangent". */
+  const float3 candidate = normalize_fallback(T, generated);
+  const float3 tangent = (abs(dot(candidate, N)) > 0.95f) ? generated : candidate;
   return normalize_fallback(tangent - N * dot(tangent, N), generated);
 }
 
@@ -156,22 +159,22 @@ void node_bsdf_toon_hair_direct(float light_index,
 
 [[node]]
 void node_bsdf_toon_hair(const float4 base_color,
-                         [[maybe_unused]] const float roughness,
+                         const float roughness,
                          float alpha,
                          float3 N,
-                         [[maybe_unused]] float3 T,
+                         float3 T,
                          const float float_weight,
                          const float diffuse_warp,
                          const float ao,
                          [[maybe_unused]] const float4 shadow_color,
-                         [[maybe_unused]] const float spec_weight,
-                         [[maybe_unused]] const float4 spec_tint,
-                         [[maybe_unused]] const float spec_shift,
-                         [[maybe_unused]] const float secondary_weight,
-                         [[maybe_unused]] const float4 secondary_tint,
-                         [[maybe_unused]] const float secondary_shift,
-                         [[maybe_unused]] const float secondary_roughness,
-                         [[maybe_unused]] const float shift,
+                         const float spec_weight,
+                         const float4 spec_tint,
+                         const float spec_shift,
+                         const float secondary_weight,
+                         const float4 secondary_tint,
+                         const float secondary_shift,
+                         const float secondary_roughness,
+                         const float shift,
                          const float rim_weight,
                          const float4 rim_tint,
                          const float rim_exponent,
@@ -180,6 +183,7 @@ void node_bsdf_toon_hair(const float4 base_color,
 {
   alpha = saturate(alpha);
   N = normalize_fallback(N, g_data.N);
+  T = toon_hair_tangent(T, N);
 
   float3 weight = float3(float_weight);
 
@@ -198,9 +202,30 @@ void node_bsdf_toon_hair(const float4 base_color,
   closure_eval(diffuse_data);
 #endif
 
+  /* View-locked anisotropic highlight (天使环). A fake key light from above the
+   * camera keeps the band on top of the hair even when there is no sun. */
+  const float3 V = coordinate_incoming(g_data.P);
+  const float3 L = normalize_fallback(V + float3(0.0f, 1.0f, 0.0f), float3(0.0f, 1.0f, 0.0f));
+  const float3 H = normalize_fallback(L + V, N);
+  const float tex_shift = shift - 0.5f;
+  const float3 spec =
+      float3(toon_hair_strand_specular(toon_hair_shift_tangent(T, N, spec_shift + tex_shift),
+                                       H,
+                                       toon_hair_exponent(roughness))) *
+          saturate(spec_weight) * max(spec_tint.rgb, float3(0.0f)) +
+      float3(toon_hair_strand_specular(
+                 toon_hair_shift_tangent(T, N, secondary_shift + tex_shift),
+                 H,
+                 toon_hair_exponent(secondary_roughness))) *
+          saturate(secondary_weight) * max(secondary_tint.rgb, float3(0.0f));
+  if (math_reduce_max(spec) > 1.0e-5f) {
+    ClosureEmission spec_data;
+    spec_data.emission = weight * spec;
+    closure_eval(spec_data);
+  }
+
   const float rim = saturate(rim_weight) *
-                    pow(saturate(1.0f - saturate(dot(N, coordinate_incoming(g_data.P)))),
-                        max(rim_exponent, 1.0e-5f));
+                    pow(saturate(1.0f - saturate(dot(N, V))), max(rim_exponent, 1.0e-5f));
   if (rim > 1.0e-5f) {
     ClosureEmission emission_data;
     emission_data.emission = weight * rim * max(rim_tint.rgb, float3(0.0f));

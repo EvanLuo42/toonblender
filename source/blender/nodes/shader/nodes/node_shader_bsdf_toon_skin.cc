@@ -7,6 +7,7 @@
  */
 
 #include "node_shader_util.hh"
+#include "node_util.hh"
 
 #include "BKE_image.hh"
 #include "BKE_node_runtime.hh"
@@ -102,6 +103,35 @@ static void node_declare(NodeDeclarationBuilder &b)
           "color");
 #define TOON_SKIN_SOCK_SKIN_LUT_ID 11
 
+  PanelDeclarationBuilder &sss = b.add_panel("Subsurface"_ustr).default_closed(true);
+  sss.add_input<decl::Float>("Subsurface Weight"_ustr)
+      .default_value(0.0f)
+      .min(0.0f)
+      .max(1.0f)
+      .subtype(PROP_FACTOR)
+      .short_label("Weight"_ustr)
+      .description(
+          "Blend between toon diffuse and subsurface scattering. With a lighting ramp this also "
+          "wraps light into the terminator and adds back-facing transmission");
+#define TOON_SKIN_SOCK_SUBSURFACE_WEIGHT_ID 12
+  sss.add_input<decl::Vector>("Subsurface Radius"_ustr)
+      .default_value({1.0f, 0.2f, 0.1f})
+      .min(0.0f)
+      .max(100.0f)
+      .short_label("Radius"_ustr)
+      .description(
+          "Scattering radius per color channel (RGB), multiplied with Scale. Larger red than "
+          "blue produces the typical skin scatter tint");
+#define TOON_SKIN_SOCK_SUBSURFACE_RADIUS_ID 13
+  sss.add_input<decl::Float>("Subsurface Scale"_ustr)
+      .default_value(0.05f)
+      .min(0.0f)
+      .max(10.0f)
+      .subtype(PROP_DISTANCE)
+      .short_label("Scale"_ustr)
+      .description("Scale factor of the subsurface scattering radius");
+#define TOON_SKIN_SOCK_SUBSURFACE_SCALE_ID 14
+
   PanelDeclarationBuilder &rim = b.add_panel("Rim"_ustr).default_closed(true);
   rim.add_input<decl::Float>("Rim Weight"_ustr)
       .default_value(0.0f)
@@ -110,22 +140,22 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the view-facing rim light");
-#define TOON_SKIN_SOCK_RIM_WEIGHT_ID 12
+#define TOON_SKIN_SOCK_RIM_WEIGHT_ID 15
   rim.add_input<decl::Color>("Rim Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Color of the rim light");
-#define TOON_SKIN_SOCK_RIM_TINT_ID 13
+#define TOON_SKIN_SOCK_RIM_TINT_ID 16
   rim.add_input<decl::Float>("Rim Exponent"_ustr)
       .default_value(5.0f)
       .min(0.0f)
       .max(20.0f)
       .short_label("Exponent"_ustr)
       .description("Tightness of the rim; higher values confine the rim to glancing angles");
-#define TOON_SKIN_SOCK_RIM_EXPONENT_ID 14
+#define TOON_SKIN_SOCK_RIM_EXPONENT_ID 17
 
   b.add_input<decl::Int>("LightIndex"_ustr).available(is_gpu_internal);
-#define TOON_SKIN_SOCK_LIGHT_INDEX_ID 15
+#define TOON_SKIN_SOCK_LIGHT_INDEX_ID 18
 }
 
 static void node_shader_init_toon_skin(bNodeTree * /*ntree*/, bNode *node)
@@ -223,12 +253,17 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
                     ensure_link(in[TOON_SKIN_SOCK_NORMAL_ID]),
                     ensure_link(in[TOON_SKIN_SOCK_WEIGHT_ID]),
                     ensure_link(in[TOON_SKIN_SOCK_DIFFUSE_WARP_ID]),
+                    ensure_link(in[TOON_SKIN_SOCK_SUBSURFACE_WEIGHT_ID]),
+                    ensure_link(in[TOON_SKIN_SOCK_SUBSURFACE_RADIUS_ID]),
+                    ensure_link(in[TOON_SKIN_SOCK_SUBSURFACE_SCALE_ID]),
                     ramp_texture,
                     &out[0].link);
   }
 
   const bool use_transparency = in[TOON_SKIN_SOCK_ALPHA_ID].socket_not_one();
   const bool use_rim = in[TOON_SKIN_SOCK_RIM_WEIGHT_ID].socket_not_zero();
+  const bool use_subsurf = in[TOON_SKIN_SOCK_SUBSURFACE_WEIGHT_ID].socket_not_zero() &&
+                           ramp_image == nullptr;
 
   eGPUMaterialFlag flag = GPU_MATFLAG_DIFFUSE;
   if (use_transparency) {
@@ -236,6 +271,9 @@ static int node_shader_gpu_bsdf_toon_skin(GPUMaterial *mat,
   }
   if (use_rim) {
     flag |= GPU_MATFLAG_EMISSION;
+  }
+  if (use_subsurf) {
+    flag |= GPU_MATFLAG_SUBSURFACE;
   }
 
   /* Toon diffuse stores its warp in an additional G-buffer layer. Marking reflection as maybe
@@ -269,8 +307,8 @@ void register_node_type_sh_bsdf_toon_skin()
   sh_node_type_base(&ntype, "ShaderNodeBsdfToonSkin"_ustr, SH_NODE_BSDF_TOON_SKIN);
   ntype.ui_name = "Toon Skin BSDF";
   ntype.ui_description =
-      "Eevee toon skin shader using ramp lighting, a LUT shadow color, and inner dark, without "
-      "PBR layers";
+      "Eevee toon skin shader using ramp lighting, a LUT shadow color, inner dark, and "
+      "subsurface scattering";
   ntype.enum_name_legacy = "BSDF_TOON_SKIN";
   ntype.nclass = NODE_CLASS_SHADER;
   ntype.declare = file_ns::node_declare;
