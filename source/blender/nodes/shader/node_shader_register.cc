@@ -35,6 +35,7 @@ void register_shader_nodes()
   register_node_type_sh_bsdf_ray_portal();
   register_node_type_sh_bsdf_refraction();
   register_node_type_sh_bsdf_toon();
+  register_node_type_sh_bsdf_toon_surface();
   register_node_type_sh_bsdf_translucent();
   register_node_type_sh_bsdf_transparent();
   register_node_type_sh_bsdf_sheen();

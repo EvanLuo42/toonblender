@@ -61,6 +61,9 @@ ClosurePacking pack_closure([[resource_table]] const PackParameters &srt, Closur
   cl_packed.data0 = gbuffer::closure_color_pack(cl.color);
   /* Some closures require additional packing. */
   switch (cl_packed.mode) {
+    case GBUF_TOON_DIFFUSE:
+      gbuffer::ToonDiffuse::pack_additional(cl_packed, cl);
+      break;
     case GBUF_REFLECTION:
       if (srt.gbuffer_has_reflection) [[static_branch]] {
         if (srt.gbuffer_reflection_colorless) [[static_branch]] {

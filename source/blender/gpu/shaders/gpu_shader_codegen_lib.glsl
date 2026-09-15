@@ -86,7 +86,7 @@ enum ClosureType : uchar {
   CLOSURE_BSDF_DIFFUSE_ID = 1u,
   // CLOSURE_BSDF_OREN_NAYAR_ID = 2u,   /* TODO */
   // CLOSURE_BSDF_SHEEN_ID = 4u,        /* TODO */
-  // CLOSURE_BSDF_DIFFUSE_TOON_ID = 5u, /* TODO */
+  CLOSURE_BSDF_DIFFUSE_TOON_ID = 5u,
   CLOSURE_BSDF_TRANSLUCENT_ID = 6u,
 
   /* Glossy */
@@ -141,6 +141,13 @@ struct ClosureOcclusion {
 struct ClosureDiffuse {
   packed_float3 color;
   packed_float3 N;
+};
+
+struct ClosureToonDiffuse {
+  packed_float3 color;
+  packed_float3 N;
+  float warp;
+  float direct_weight;
 };
 
 struct ClosureSubsurface {
@@ -203,6 +210,16 @@ ClosureDiffuse to_closure_diffuse(ClosureUndetermined cl)
   ClosureDiffuse closure;
   closure.N = cl.N;
   closure.color = cl.color;
+  return closure;
+}
+
+ClosureToonDiffuse to_closure_toon_diffuse(ClosureUndetermined cl)
+{
+  ClosureToonDiffuse closure;
+  closure.N = cl.N;
+  closure.color = cl.color;
+  closure.warp = cl.data.x;
+  closure.direct_weight = cl.data.y;
   return closure;
 }
 

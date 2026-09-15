@@ -625,6 +625,7 @@ void frag_main([[resource_table]] Resources &srt,
   for (uchar i = 0; i < GBUFFER_LAYER_MAX; i++) {
     switch (gbuf.layer[i].type) {
       case CLOSURE_BSDF_DIFFUSE_ID:
+      case CLOSURE_BSDF_DIFFUSE_TOON_ID:
       case CLOSURE_BSDF_TRANSLUCENT_ID:
       case CLOSURE_BSDF_MICROFACET_GGX_REFLECTION_ID:
       case CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID:

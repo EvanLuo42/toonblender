@@ -173,6 +173,7 @@ void combine_frag([[resource_table]] Combine &srt,
           case CLOSURE_BSDF_TRANSLUCENT_ID:
           case CLOSURE_BSSRDF_BURLEY_ID:
           case CLOSURE_BSDF_DIFFUSE_ID:
+          case CLOSURE_BSDF_DIFFUSE_TOON_ID:
             diffuse_color += cl.color;
             diffuse_direct += closure_direct_light * cl.color;
             diffuse_indirect += closure_indirect_light * cl.color;

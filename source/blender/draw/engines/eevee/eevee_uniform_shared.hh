@@ -33,6 +33,8 @@ enum [[host_shared]] LightingType : uint32_t {
   /* WORKAROUND: Special value used to tag translucent BSDF with thickness.
    * Fall back to LIGHT_DIFFUSE. */
   LIGHT_TRANSLUCENT_WITH_THICKNESS = 4u,
+  /* Uses the diffuse light power while selecting Half-Lambert evaluation. */
+  LIGHT_TOON_DIFFUSE = 8u,
 };
 
 struct [[host_shared]] ShadowSceneData {

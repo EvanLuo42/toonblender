@@ -147,6 +147,7 @@
 #include "gpu_shader_material_tex_white_noise.bsl.hh"          /* IWYU pragma: export */
 #include "gpu_shader_material_texture_coordinates.bsl.hh"      /* IWYU pragma: export */
 #include "gpu_shader_material_toon.bsl.hh"                     /* IWYU pragma: export */
+#include "gpu_shader_material_toon_surface.bsl.hh"             /* IWYU pragma: export */
 #include "gpu_shader_material_transform_utils.bsl.hh"          /* IWYU pragma: export */
 #include "gpu_shader_material_translucent.bsl.hh"              /* IWYU pragma: export */
 #include "gpu_shader_material_transparent.bsl.hh"              /* IWYU pragma: export */

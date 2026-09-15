@@ -56,6 +56,10 @@ Closure closure_eval(ClosureDiffuse /*diffuse*/)
 {
   return {};
 }
+Closure closure_eval(ClosureToonDiffuse /*diffuse*/)
+{
+  return {};
+}
 Closure closure_eval(ClosureSubsurface /*diffuse*/)
 {
   return {};
@@ -282,6 +286,13 @@ void node_light_evaluation_common_impl(int /*light_index*/,
                                        float3 & /*direction*/,
                                        float & /*distance*/,
                                        float & /*mask*/)
+{
+}
+
+void node_toon_light_evaluation_impl(int /*light_index*/,
+                                     float3 /*position*/,
+                                     float3 & /*direction*/,
+                                     float3 & /*radiance*/)
 {
 }
 

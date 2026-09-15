@@ -48,6 +48,9 @@ ClosureUndetermined unpack_closure(ClosurePacking cl_in)
   cl.N = cl_in.N;
   /* Some closures require additional unpacking. */
   switch (cl_in.mode) {
+    case GBUF_TOON_DIFFUSE:
+      gbuffer::ToonDiffuse::unpack_additional(cl, cl_in.data1);
+      break;
 #ifdef GBUFFER_HAS_REFLECTION
     case GBUF_REFLECTION:
       gbuffer::Reflection::unpack_additional(cl, cl_in.data1);

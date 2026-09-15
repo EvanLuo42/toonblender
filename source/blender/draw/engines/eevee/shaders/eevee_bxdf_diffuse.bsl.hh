@@ -62,6 +62,36 @@ ClosureLight bxdf_diffuse_light(ClosureUndetermined cl, float3 V)
   return light;
 }
 
+float bxdf_toon_diffuse_perceived_roughness()
+{
+  return 1.0f;
+}
+
+LightProbeRay bxdf_toon_diffuse_lightprobe(ClosureToonDiffuse cl)
+{
+  LightProbeRay probe;
+  probe.perceptual_roughness = bxdf_toon_diffuse_perceived_roughness();
+  /* A shorter dominant direction blends towards ambient irradiance, approximating light wrap. */
+  probe.dominant_direction = cl.N * (1.0f - cl.warp);
+  return probe;
+}
+
+ClosureLight bxdf_toon_diffuse_light(ClosureUndetermined cl, float3 V)
+{
+  ClosureLight light;
+  light.N = cl.N;
+  light.type = LIGHT_TOON_DIFFUSE;
+
+  eevee::LTCData ltc_data = eevee::LTCData::identity(light.N, V);
+  /* The identity diffuse LTC does not otherwise use this field. */
+  ltc_data.attenuation_factor = to_closure_toon_diffuse(cl).warp;
+  if (to_closure_toon_diffuse(cl).direct_weight == 0.0f) {
+    ltc_data.form_factor_type = LTCFormFactorType::ToonDirectDisabled;
+  }
+  ltc_data.pack_to(light);
+  return light;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

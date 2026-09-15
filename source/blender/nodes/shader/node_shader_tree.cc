@@ -685,6 +685,7 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
             case SH_NODE_BSDF_RAY_PORTAL:
             case SH_NODE_BSDF_REFRACTION:
             case SH_NODE_BSDF_TOON:
+            case SH_NODE_BSDF_TOON_SURFACE:
             case SH_NODE_BSDF_TRANSLUCENT:
             case SH_NODE_BSDF_TRANSPARENT:
             case SH_NODE_BSDF_SHEEN:
@@ -748,6 +749,7 @@ static bool closure_node_filter(const bNode *node)
     case SH_NODE_BSDF_RAY_PORTAL:
     case SH_NODE_BSDF_REFRACTION:
     case SH_NODE_BSDF_TOON:
+    case SH_NODE_BSDF_TOON_SURFACE:
     case SH_NODE_BSDF_TRANSLUCENT:
     case SH_NODE_BSDF_TRANSPARENT:
     case SH_NODE_BSDF_SHEEN:
@@ -975,13 +977,97 @@ static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
   }
 }
 
+static bool ntree_shader_is_light_accumulation_node(const bNode &node)
+{
+  return node.type_legacy == SH_NODE_LIGHT_ACCUMULATION ||
+         (node.type_legacy == SH_NODE_BSDF_TOON_SURFACE && node.custom1 == 1);
+}
+
+static void ntree_shader_add_toon_ramp_lighting_nodes(bNodeTree *ntree)
+{
+  Vector<bNode *> toon_nodes;
+  for (bNode &node : ntree->nodes) {
+    if (node.type_legacy != SH_NODE_BSDF_TOON_SURFACE || node.custom1 != 0) {
+      continue;
+    }
+    const bNodeSocket *ramp_socket = ntree_shader_node_find_input(&node, "Ramp Texture");
+    if (ramp_socket && ramp_socket->default_value_typed<bNodeSocketValueImage>()->value) {
+      toon_nodes.append(&node);
+    }
+  }
+
+  for (bNode *toon_node : toon_nodes) {
+    Map<const bNodeSocket *, bNodeSocket *> socket_map;
+    bNode *direct_node = bke::node_copy_with_mapping(ntree,
+                                                     *toon_node,
+                                                     LIB_ID_CREATE_NO_USER_REFCOUNT |
+                                                         LIB_ID_CREATE_NO_MAIN,
+                                                     std::nullopt,
+                                                     std::nullopt,
+                                                     socket_map,
+                                                     true);
+    direct_node->custom1 = 1;
+    direct_node->runtime->original = toon_node->runtime->original;
+    for (bNodeSocket &socket : direct_node->inputs) {
+      socket.link = nullptr;
+    }
+    for (bNodeSocket &socket : direct_node->outputs) {
+      socket.link = nullptr;
+    }
+
+    Vector<bNodeLink *> incoming_links;
+    Vector<bNodeLink *> outgoing_links;
+    for (bNodeLink &link : ntree->links) {
+      if (link.tonode == toon_node) {
+        incoming_links.append(&link);
+      }
+      if (link.fromnode == toon_node) {
+        outgoing_links.append(&link);
+      }
+    }
+    for (const bNodeLink *link : incoming_links) {
+      bke::node_add_link(*ntree,
+                         *link->fromnode,
+                         *link->fromsock,
+                         *direct_node,
+                         *socket_map.lookup(link->tosock));
+    }
+
+    bNode *add_node = bke::node_add_static_node(nullptr, *ntree, SH_NODE_ADD_SHADER);
+    bNodeSocket &toon_output = *ntree_shader_node_find_output(toon_node, "BSDF");
+    bNodeSocket &direct_output = *ntree_shader_node_find_output(direct_node, "BSDF");
+    bNodeSocket &add_output = *ntree_shader_node_find_output(add_node, "Shader");
+    bke::node_add_link(*ntree,
+                       *toon_node,
+                       toon_output,
+                       *add_node,
+                       *ntree_shader_node_input_get(add_node, 0));
+    bke::node_add_link(*ntree,
+                       *direct_node,
+                       direct_output,
+                       *add_node,
+                       *ntree_shader_node_input_get(add_node, 1));
+
+    for (bNodeLink *link : outgoing_links) {
+      bke::node_add_link(*ntree, *add_node, add_output, *link->tonode, *link->tosock);
+      bke::node_remove_link(ntree, *link);
+    }
+  }
+
+  if (!toon_nodes.is_empty()) {
+    BKE_ntree_update_without_main(*ntree);
+  }
+}
+
 static void ntree_shader_setup_custom_lighting_zone(bNodeTree *ntree)
 {
+  ntree_shader_add_toon_ramp_lighting_nodes(ntree);
+
   /* Safeguard to not emit a LIGHT_ITER_INTERNAL_INPUT without a LIGHT_ITER_INTERNAL_OUTPUT raising
    * an assert in the shader dead code optimization. */
   bool has_light_accumulation = false;
   for (bNode &node : ntree->nodes) {
-    if (node.type_legacy == SH_NODE_LIGHT_ACCUMULATION) {
+    if (ntree_shader_is_light_accumulation_node(node)) {
       has_light_accumulation = true;
       break;
     }
@@ -1005,8 +1091,8 @@ static void ntree_shader_setup_custom_lighting_zone(bNodeTree *ntree)
   Map<bNodeSocket *, bNodeSocket *> accumulation_out_to_zone_out;
 
   for (bNode &node : ntree->nodes) {
-    if (ELEM(node.type_legacy,
-             SH_NODE_LIGHT_ACCUMULATION,
+    if (ntree_shader_is_light_accumulation_node(node) ||
+        ELEM(node.type_legacy,
              SH_NODE_LIGHT_INFO,
              SH_NODE_LIGHT_EVALUATION,
              SH_NODE_SHADOW_RAYCAST) ||
@@ -1015,13 +1101,16 @@ static void ntree_shader_setup_custom_lighting_zone(bNodeTree *ntree)
     {
       ensure_nodes();
       /* Connect LightIndex socket */
+      bNodeSocket *light_index = node.type_legacy == SH_NODE_BSDF_TOON_SURFACE ?
+                                     ntree_shader_node_find_input(&node, "LightIndex") :
+                                     ntree_shader_node_input_get(&node, 0);
       bke::node_add_link(*ntree,
                          *zone_input,
                          *ntree_shader_node_output_get(zone_input, 0),
                          node,
-                         *ntree_shader_node_input_get(&node, 0));
+                         *light_index);
 
-      if (node.type_legacy == SH_NODE_LIGHT_ACCUMULATION) {
+      if (ntree_shader_is_light_accumulation_node(node)) {
         /* Connect accumulation result to the zone output node.
          * Create one zone IO for each Light Accumulation node. */
         bke::node_add_static_socket(
@@ -1047,7 +1136,7 @@ static void ntree_shader_setup_custom_lighting_zone(bNodeTree *ntree)
 
   Vector<bNodeLink *> links_to_remove;
   for (bNodeLink &link : ntree->links) {
-    if (link.fromnode->type_legacy == SH_NODE_LIGHT_ACCUMULATION &&
+    if (ntree_shader_is_light_accumulation_node(*link.fromnode) &&
         link.tonode->type_legacy != SH_NODE_LIGHT_ITER_INTERNAL_OUTPUT)
     {
       bke::node_add_link(*ntree,

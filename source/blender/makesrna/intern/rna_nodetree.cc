@@ -10782,6 +10782,7 @@ static void rna_def_nodes(BlenderRNA *brna)
   define("ShaderNode", "ShaderNodeBsdfRefraction", def_refraction);
   define("ShaderNode", "ShaderNodeBsdfSheen", def_sheen);
   define("ShaderNode", "ShaderNodeBsdfToon", def_toon);
+  define("ShaderNode", "ShaderNodeBsdfToonSurface");
   define("ShaderNode", "ShaderNodeBsdfTranslucent");
   define("ShaderNode", "ShaderNodeBsdfTransparent");
   define("ShaderNode", "ShaderNodeBump", def_sh_bump);

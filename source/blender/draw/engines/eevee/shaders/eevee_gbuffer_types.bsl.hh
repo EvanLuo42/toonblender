@@ -74,6 +74,7 @@ enum GBufferMode : uchar {
 
   /** Used for surfaces that have no lit closure and just encode a normal layer. */
   GBUF_UNLIT = 4u,
+  GBUF_TOON_DIFFUSE = 5u,
 
   /**
    * Special bit that marks all closures with refraction.
@@ -99,6 +100,8 @@ GBufferMode closure_type_to_mode(ClosureType type, bool is_grayscale)
   switch (type) {
     case CLOSURE_BSDF_DIFFUSE_ID:
       return GBUF_DIFFUSE;
+    case CLOSURE_BSDF_DIFFUSE_TOON_ID:
+      return GBUF_TOON_DIFFUSE;
     case CLOSURE_BSDF_TRANSLUCENT_ID:
       return GBUF_TRANSLUCENT;
     case CLOSURE_BSDF_MICROFACET_GGX_REFLECTION_ID:
@@ -119,6 +122,8 @@ ClosureType mode_to_closure_type(uint mode)
   switch (mode) {
     case GBUF_DIFFUSE:
       return ClosureType(CLOSURE_BSDF_DIFFUSE_ID);
+    case GBUF_TOON_DIFFUSE:
+      return ClosureType(CLOSURE_BSDF_DIFFUSE_TOON_ID);
     case GBUF_TRANSLUCENT:
       return ClosureType(CLOSURE_BSDF_TRANSLUCENT_ID);
     case GBUF_SUBSURFACE:
@@ -548,7 +553,8 @@ struct ClosurePacking {
   bool use_data1() const
   {
     return this->mode == GBUF_REFLECTION || this->mode == GBUF_REFRACTION ||
-           this->mode == GBUF_THIN_REFRACTION || this->mode == GBUF_SUBSURFACE;
+           this->mode == GBUF_THIN_REFRACTION || this->mode == GBUF_SUBSURFACE ||
+           this->mode == GBUF_TOON_DIFFUSE;
   }
 
   bool is_empty() const
@@ -579,6 +585,19 @@ struct Subsurface {
   static void unpack_additional(ClosureUndetermined &cl, float4 data1)
   {
     cl.data.rgb = gbuffer::sss_radii_unpack(data1);
+  }
+};
+
+struct ToonDiffuse {
+  static void pack_additional(ClosurePacking &cl_packed, ClosureUndetermined cl)
+  {
+    cl_packed.data1 = float4(cl.data.x, cl.data.y, 0.0f, 0.0f);
+  }
+
+  static void unpack_additional(ClosureUndetermined &cl, float4 data1)
+  {
+    cl.data.x = data1.x; /* Diffuse warp. */
+    cl.data.y = data1.y; /* Direct-light weight. */
   }
 };
 

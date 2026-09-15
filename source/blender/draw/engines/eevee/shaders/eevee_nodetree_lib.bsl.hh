@@ -96,6 +96,20 @@ Closure closure_eval(ClosureDiffuse diffuse)
   return Closure(0);
 }
 
+Closure closure_eval(ClosureToonDiffuse diffuse)
+{
+  ClosureUndetermined cl;
+  closure_base_copy(cl, diffuse);
+  cl.data.x = diffuse.warp;
+  cl.data.y = diffuse.direct_weight;
+#if (CLOSURE_BIN_COUNT > 1) && defined(MAT_TRANSLUCENT) && !defined(MAT_CLEARCOAT)
+  closure_select(g_closure_bins[1], cl);
+#else
+  closure_select(g_closure_bins[0], cl);
+#endif
+  return Closure(0);
+}
+
 Closure closure_eval(ClosureSubsurface diffuse)
 {
   ClosureUndetermined cl;
@@ -934,6 +948,25 @@ void node_light_evaluation_common_impl(
   direction = lv.L;
   distance = lv.dist;
   mask = light_attenuation_surface(light, is_directional, lv);
+}
+
+void node_toon_light_evaluation_impl(
+    int light_index, float3 position, float3 &direction, float3 &radiance)
+{
+  /* clang-format off */ /* Multi-line macros would break line count. */
+  [[resource_table]] const eevee::LightRenderData &lrd = resource_table_get(eevee::LightRenderData);
+  /* clang-format on */
+
+  LightData light = lrd.light_buf[light_index];
+  const bool is_directional = (light.type == LIGHT_SUN) || (light.type == LIGHT_SUN_ORTHO);
+  LightVector lv = light_vector_get(light, is_directional, position);
+
+  direction = lv.L;
+  /* `shape_power` is radiance and expects an LTC solid-angle factor. Using it as a toon
+   * irradiance term over-brightens small suns and spheres (the ramp then clips to white).
+   * `point_power` is intensity/irradiance; `light_point_light` restores distance falloff. */
+  radiance = light.color * light.point_power * light_point_light(light, is_directional, lv) *
+             light_attenuation_surface(light, is_directional, lv);
 }
 
 template<bool use_diffuse>

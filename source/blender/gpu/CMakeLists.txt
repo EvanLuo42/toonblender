@@ -723,6 +723,7 @@ set(GLSL_SRC
   shaders/material/gpu_shader_material_tex_white_noise.bsl.hh
   shaders/material/gpu_shader_material_texture_coordinates.bsl.hh
   shaders/material/gpu_shader_material_toon.bsl.hh
+  shaders/material/gpu_shader_material_toon_surface.bsl.hh
   shaders/material/gpu_shader_material_transform_utils.bsl.hh
   shaders/material/gpu_shader_material_translucent.bsl.hh
   shaders/material/gpu_shader_material_transparent.bsl.hh

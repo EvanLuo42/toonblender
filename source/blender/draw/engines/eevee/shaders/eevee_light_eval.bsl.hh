@@ -74,9 +74,31 @@ void eval_single_closure(sampler2DArray util_tx,
   /* TODO(not_mark): remove, and update tests as this causes precision change. */
   /* Load LTC matrix and rotate into orthonormal basis around N. */
   LTCData ltc_data = LTCData::unpack_from(cl);
+  if (cl.type == LIGHT_TOON_DIFFUSE &&
+      ltc_data.form_factor_type == LTCFormFactorType::ToonDirectDisabled)
+  {
+    return;
+  }
   float3x3 T = from_incident_vector(cl.N, V);
   ltc_data.Minv = ltc_data.Minv * transpose(T);
   float ltc_result = light_ltc(util_tx, light, ltc_data, lv, vertices);
+
+  if (cl.type == LIGHT_TOON_DIFFUSE && ltc_data.attenuation_factor > 0.0f) {
+    const float warp = ltc_data.attenuation_factor;
+
+    /* Integrate signed cosine as the difference between the two clipped hemispheres. */
+    LTCData back_ltc = LTCData::identity(-cl.N, V);
+    back_ltc.Minv = back_ltc.Minv * transpose(from_incident_vector(-cl.N, V));
+    const float signed_cosine = ltc_result - light_ltc(util_tx, light, back_ltc, lv, vertices);
+
+    /* The constant term of Half-Lambert is an unclipped uniform spherical integral. */
+    LTCData uniform_ltc = LTCData::identity(cl.N, V);
+    uniform_ltc.form_factor_type = LTCFormFactorType::TwoSidedCosineSphere;
+    uniform_ltc.Minv = uniform_ltc.Minv * transpose(T);
+    const float uniform_term = light_ltc(util_tx, light, uniform_ltc, lv, vertices);
+
+    ltc_result = max((1.0f - warp) * signed_cosine + warp * uniform_term, 0.0f);
+  }
 
   float3 out_radiance = light.color * ltc_result;
   float visibility = shadow * attenuation;
@@ -123,6 +145,10 @@ template<bool is_transmission> struct EvalCtx {
 
     float attenuation = light_attenuation_surface(light, is_directional, lv);
     float facing = light_attenuation_facing(light, lv.L, lv.dist, stack.cl[0].N, is_transmission);
+    if (!is_transmission && stack.cl[0].type == LIGHT_TOON_DIFFUSE) {
+      /* Half-Lambert intentionally receives light beyond the shading-normal horizon. */
+      facing = 1.0f;
+    }
 
     if (!is_translucent_with_thickness) {
       /* Only do attenuation for this case, since we integrate the whole sphere for translucency.

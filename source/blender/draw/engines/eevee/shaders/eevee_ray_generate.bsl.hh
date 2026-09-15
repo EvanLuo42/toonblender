@@ -38,6 +38,7 @@ BsdfSample ray_generate_direction(float2 noise,
     case CLOSURE_BSDF_TRANSLUCENT_ID:
     case CLOSURE_BSSRDF_BURLEY_ID:
     case CLOSURE_BSDF_DIFFUSE_ID:
+    case CLOSURE_BSDF_DIFFUSE_TOON_ID:
       break;
     case CLOSURE_NONE_ID:
       assert(false);
@@ -55,6 +56,7 @@ BsdfSample ray_generate_direction(float2 noise,
       break;
     case CLOSURE_BSSRDF_BURLEY_ID:
     case CLOSURE_BSDF_DIFFUSE_ID:
+    case CLOSURE_BSDF_DIFFUSE_TOON_ID:
       samp = bxdf_diffuse_sample(random_point_on_cylinder);
       break;
     case CLOSURE_BSDF_MICROFACET_GGX_REFLECTION_ID: {

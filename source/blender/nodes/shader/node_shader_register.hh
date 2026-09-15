@@ -31,6 +31,7 @@ void register_node_type_sh_bsdf_principled();
 void register_node_type_sh_bsdf_ray_portal();
 void register_node_type_sh_bsdf_refraction();
 void register_node_type_sh_bsdf_toon();
+void register_node_type_sh_bsdf_toon_surface();
 void register_node_type_sh_bsdf_translucent();
 void register_node_type_sh_bsdf_transparent();
 void register_node_type_sh_bsdf_sheen();

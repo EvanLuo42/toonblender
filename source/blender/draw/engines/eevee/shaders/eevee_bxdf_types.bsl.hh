@@ -28,6 +28,8 @@ enum class LTCFormFactorType : uchar {
   OneSidedCosineSphereClipped = 0u,
   /* Form factor of an unclipped sphere affecting a two-sided surface. */
   TwoSidedCosineSphere = 1u,
+  /* Internal marker for a Toon diffuse closure evaluated by a custom lighting zone. */
+  ToonDirectDisabled = 2u,
 };
 
 struct ClosureLight {
