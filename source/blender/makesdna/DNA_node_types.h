@@ -2789,6 +2789,14 @@ struct NodeShaderToonSurface {
   ImageUser diffuse_lut_iuser;
 };
 
+/** Runtime image state for the Toon Skin ramp and flattened 3D skin LUT. */
+struct NodeShaderToonSkin {
+  DNA_DEFINE_CXX_METHODS(NodeShaderToonSkin)
+
+  ImageUser ramp_iuser;
+  ImageUser skin_lut_iuser;
+};
+
 /** TEX_output. */
 struct TexNodeOutput {
   DNA_DEFINE_CXX_METHODS(TexNodeOutput)

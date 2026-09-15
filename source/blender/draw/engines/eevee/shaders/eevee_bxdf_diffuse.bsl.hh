@@ -71,8 +71,11 @@ LightProbeRay bxdf_toon_diffuse_lightprobe(ClosureToonDiffuse cl)
 {
   LightProbeRay probe;
   probe.perceptual_roughness = bxdf_toon_diffuse_perceived_roughness();
-  /* A shorter dominant direction blends towards ambient irradiance, approximating light wrap. */
-  probe.dominant_direction = cl.N * (1.0f - cl.warp);
+  /* A shorter dominant direction blends towards ambient irradiance, approximating light wrap.
+   * When a lighting ramp handles local lights (`direct_weight` 0), keep IBL directional so
+   * the wrap fill does not wash pale albedos to white. */
+  const float wrap = (cl.direct_weight == 0.0f) ? 0.0f : cl.warp;
+  probe.dominant_direction = cl.N * (1.0f - wrap);
   return probe;
 }
 

@@ -326,6 +326,11 @@ class NODE_MT_shader_node_shader_base(node_add_menu.NodeMenu):
         )
         self.node_operator(
             layout,
+            "ShaderNodeBsdfToonSkin",
+            poll=object_material_shader_nodes_poll(context) and eevee_shader_nodes_poll(context),
+        )
+        self.node_operator(
+            layout,
             "ShaderNodeBsdfTranslucent",
             poll=object_material_shader_nodes_poll(context),
         )

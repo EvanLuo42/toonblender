@@ -686,6 +686,7 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
             case SH_NODE_BSDF_REFRACTION:
             case SH_NODE_BSDF_TOON:
             case SH_NODE_BSDF_TOON_SURFACE:
+            case SH_NODE_BSDF_TOON_SKIN:
             case SH_NODE_BSDF_TRANSLUCENT:
             case SH_NODE_BSDF_TRANSPARENT:
             case SH_NODE_BSDF_SHEEN:
@@ -750,6 +751,7 @@ static bool closure_node_filter(const bNode *node)
     case SH_NODE_BSDF_REFRACTION:
     case SH_NODE_BSDF_TOON:
     case SH_NODE_BSDF_TOON_SURFACE:
+    case SH_NODE_BSDF_TOON_SKIN:
     case SH_NODE_BSDF_TRANSLUCENT:
     case SH_NODE_BSDF_TRANSPARENT:
     case SH_NODE_BSDF_SHEEN:
@@ -977,17 +979,22 @@ static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
   }
 }
 
+static bool ntree_shader_is_toon_ramp_bsdf(const bNode &node)
+{
+  return ELEM(node.type_legacy, SH_NODE_BSDF_TOON_SURFACE, SH_NODE_BSDF_TOON_SKIN);
+}
+
 static bool ntree_shader_is_light_accumulation_node(const bNode &node)
 {
   return node.type_legacy == SH_NODE_LIGHT_ACCUMULATION ||
-         (node.type_legacy == SH_NODE_BSDF_TOON_SURFACE && node.custom1 == 1);
+         (ntree_shader_is_toon_ramp_bsdf(node) && node.custom1 == 1);
 }
 
 static void ntree_shader_add_toon_ramp_lighting_nodes(bNodeTree *ntree)
 {
   Vector<bNode *> toon_nodes;
   for (bNode &node : ntree->nodes) {
-    if (node.type_legacy != SH_NODE_BSDF_TOON_SURFACE || node.custom1 != 0) {
+    if (!ntree_shader_is_toon_ramp_bsdf(node) || node.custom1 != 0) {
       continue;
     }
     const bNodeSocket *ramp_socket = ntree_shader_node_find_input(&node, "Ramp Texture");
@@ -1101,7 +1108,7 @@ static void ntree_shader_setup_custom_lighting_zone(bNodeTree *ntree)
     {
       ensure_nodes();
       /* Connect LightIndex socket */
-      bNodeSocket *light_index = node.type_legacy == SH_NODE_BSDF_TOON_SURFACE ?
+      bNodeSocket *light_index = ntree_shader_is_toon_ramp_bsdf(node) ?
                                      ntree_shader_node_find_input(&node, "LightIndex") :
                                      ntree_shader_node_input_get(&node, 0);
       bke::node_add_link(*ntree,

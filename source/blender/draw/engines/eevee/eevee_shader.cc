@@ -1163,7 +1163,7 @@ void ShaderModule::material_create_info_amend(GPUMaterial *gpumat, GPUCodegenOut
     info.compilation_constant(
         gpu::shader::Type::int_t, "light_closure_eval_count_transmit", transmit_eval_count);
     /* Forward and Shader-to-RGB accumulate jittered shadow rays over samples.
-     * The deferred hybrid lighting-node path (Toon Surface ramp) traces shadows in
+     * The deferred hybrid lighting-node path (toon ramp BSDFs) traces shadows in
      * the gbuffer pass, which is not denoised — a stable center ray avoids speckle. */
     const bool shadow_random = (pipeline_type == MAT_PIPE_FORWARD) || use_shader_to_rgba;
     info.compilation_constant(gpu::shader::Type::bool_t, "shadow_random", shadow_random);
