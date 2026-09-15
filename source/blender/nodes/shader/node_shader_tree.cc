@@ -687,6 +687,7 @@ static void ntree_shader_weight_tree_invert(bNodeTree *ntree, bNode *output_node
             case SH_NODE_BSDF_TOON:
             case SH_NODE_BSDF_TOON_SURFACE:
             case SH_NODE_BSDF_TOON_SKIN:
+            case SH_NODE_BSDF_TOON_HAIR:
             case SH_NODE_BSDF_TRANSLUCENT:
             case SH_NODE_BSDF_TRANSPARENT:
             case SH_NODE_BSDF_SHEEN:
@@ -752,6 +753,7 @@ static bool closure_node_filter(const bNode *node)
     case SH_NODE_BSDF_TOON:
     case SH_NODE_BSDF_TOON_SURFACE:
     case SH_NODE_BSDF_TOON_SKIN:
+    case SH_NODE_BSDF_TOON_HAIR:
     case SH_NODE_BSDF_TRANSLUCENT:
     case SH_NODE_BSDF_TRANSPARENT:
     case SH_NODE_BSDF_SHEEN:
@@ -981,7 +983,10 @@ static void ntree_shader_pruned_unused(bNodeTree *ntree, bNode *output_node)
 
 static bool ntree_shader_is_toon_ramp_bsdf(const bNode &node)
 {
-  return ELEM(node.type_legacy, SH_NODE_BSDF_TOON_SURFACE, SH_NODE_BSDF_TOON_SKIN);
+  return ELEM(node.type_legacy,
+              SH_NODE_BSDF_TOON_SURFACE,
+              SH_NODE_BSDF_TOON_SKIN,
+              SH_NODE_BSDF_TOON_HAIR);
 }
 
 static bool ntree_shader_is_light_accumulation_node(const bNode &node)

@@ -2798,6 +2798,14 @@ struct NodeShaderToonSkin {
   ImageUser skin_lut_iuser;
 };
 
+/** Runtime image state for the Toon Hair ramps. */
+struct NodeShaderToonHair {
+  DNA_DEFINE_CXX_METHODS(NodeShaderToonHair)
+
+  ImageUser ramp_iuser;
+  ImageUser spec_ramp_iuser;
+};
+
 /** TEX_output. */
 struct TexNodeOutput {
   DNA_DEFINE_CXX_METHODS(TexNodeOutput)

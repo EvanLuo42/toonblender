@@ -36,6 +36,7 @@ set(SRC
   nodes/node_shader_bsdf_refraction.cc
   nodes/node_shader_bsdf_sheen.cc
   nodes/node_shader_bsdf_toon.cc
+  nodes/node_shader_bsdf_toon_hair.cc
   nodes/node_shader_bsdf_toon_skin.cc
   nodes/node_shader_bsdf_toon_surface.cc
   nodes/node_shader_bsdf_translucent.cc
