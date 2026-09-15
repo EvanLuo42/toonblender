@@ -38,12 +38,6 @@ float3 toon_surface_sample_flattened_lut(sampler2D lut_tx, float3 color)
 }
 
 [[node]]
-void toon_surface_diffuse_color(float4 base_color, float4 diffuse_texture, float4 &result)
-{
-  result = max(base_color * diffuse_texture, float4(0.0f));
-}
-
-[[node]]
 void toon_surface_diffuse_lut(float4 diffuse_color,
                               float influence,
                               sampler2D lut_tx,
@@ -124,7 +118,6 @@ void node_bsdf_toon_surface(float4 base_color,
                             float3 N,
                             const float float_weight,
                             [[maybe_unused]] const float diffuse_warp,
-                            [[maybe_unused]] const float4 diffuse_texture,
                             [[maybe_unused]] const float ao,
                             [[maybe_unused]] const float diffuse_lut_influence,
                             const float specular_ior_level,

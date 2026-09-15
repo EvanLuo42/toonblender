@@ -31,7 +31,7 @@ static void node_declare(NodeDeclarationBuilder &b)
 
   b.add_input<decl::Color>("Base Color"_ustr)
       .default_value({0.8f, 0.8f, 0.8f, 1.0f})
-      .description("Base color of the material");
+      .description("Diffuse albedo; connect the diffuse texture here");
 #define TOON_SURFACE_SOCK_BASE_COLOR_ID 0
   b.add_input<decl::Float>("Metallic"_ustr)
       .default_value(0.0f)
@@ -74,17 +74,13 @@ static void node_declare(NodeDeclarationBuilder &b)
       .description(
           "Wrap diffuse illumination around the surface; 0 is Lambert and 0.5 is Half-Lambert");
 #define TOON_SURFACE_SOCK_DIFFUSE_WARP_ID 7
-  diffuse.add_input<decl::Color>("Diffuse Texture"_ustr)
-      .default_value({1.0f, 1.0f, 1.0f, 1.0f})
-      .description("Texture color multiplied with Base Color before diffuse lighting");
-#define TOON_SURFACE_SOCK_DIFFUSE_TEXTURE_ID 8
   diffuse.add_input<decl::Float>("AO"_ustr)
       .default_value(1.0f)
       .min(0.0f)
       .max(1.0f)
       .subtype(PROP_FACTOR)
       .description("Ambient occlusion applied to the diffuse component");
-#define TOON_SURFACE_SOCK_AO_ID 9
+#define TOON_SURFACE_SOCK_AO_ID 8
   diffuse.add_input<decl::Float>("Diffuse LUT Influence"_ustr)
       .default_value(1.0f)
       .min(0.0f)
@@ -92,13 +88,13 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("LUT Influence"_ustr)
       .description("Blend between the diffuse color and the color transformed by Diffuse LUT");
-#define TOON_SURFACE_SOCK_DIFFUSE_LUT_INFLUENCE_ID 10
+#define TOON_SURFACE_SOCK_DIFFUSE_LUT_INFLUENCE_ID 9
   diffuse.add_input<decl::Image>("Ramp Texture"_ustr)
       .description("Horizontal lighting ramp sampled using the warped normal-light angle");
-#define TOON_SURFACE_SOCK_RAMP_TEXTURE_ID 11
+#define TOON_SURFACE_SOCK_RAMP_TEXTURE_ID 10
   diffuse.add_input<decl::Image>("Diffuse LUT"_ustr)
       .description("Flattened 3D color LUT with dimensions N squared by N");
-#define TOON_SURFACE_SOCK_DIFFUSE_LUT_ID 12
+#define TOON_SURFACE_SOCK_DIFFUSE_LUT_ID 11
 
   PanelDeclarationBuilder &specular = b.add_panel("Specular"_ustr).default_closed(true);
   specular.add_input<decl::Float>("Specular IOR Level"_ustr)
@@ -108,12 +104,12 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("IOR Level"_ustr)
       .description("Adjust the intensity of dielectric GGX reflection");
-#define TOON_SURFACE_SOCK_SPECULAR_ID 13
+#define TOON_SURFACE_SOCK_SPECULAR_ID 12
   specular.add_input<decl::Color>("Specular Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Tint the GGX specular reflection");
-#define TOON_SURFACE_SOCK_SPECULAR_TINT_ID 14
+#define TOON_SURFACE_SOCK_SPECULAR_TINT_ID 13
 
   PanelDeclarationBuilder &sheen = b.add_panel("Fibre / Sheen"_ustr).default_closed(true);
   sheen.add_input<decl::Float>("Sheen Weight"_ustr)
@@ -123,7 +119,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the microfiber sheen layer");
-#define TOON_SURFACE_SOCK_SHEEN_WEIGHT_ID 15
+#define TOON_SURFACE_SOCK_SHEEN_WEIGHT_ID 14
   sheen.add_input<decl::Float>("Sheen Roughness"_ustr)
       .default_value(0.5f)
       .min(0.0f)
@@ -131,12 +127,12 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Roughness"_ustr)
       .description("Roughness of the microfiber sheen layer");
-#define TOON_SURFACE_SOCK_SHEEN_ROUGHNESS_ID 16
+#define TOON_SURFACE_SOCK_SHEEN_ROUGHNESS_ID 15
   sheen.add_input<decl::Color>("Sheen Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Color of the microfiber sheen reflection");
-#define TOON_SURFACE_SOCK_SHEEN_TINT_ID 17
+#define TOON_SURFACE_SOCK_SHEEN_TINT_ID 16
 
   PanelDeclarationBuilder &coat = b.add_panel("Coat"_ustr).default_closed(true);
   coat.add_input<decl::Float>("Coat Weight"_ustr)
@@ -146,7 +142,7 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Weight"_ustr)
       .description("Intensity of the dielectric coat layer");
-#define TOON_SURFACE_SOCK_COAT_WEIGHT_ID 18
+#define TOON_SURFACE_SOCK_COAT_WEIGHT_ID 17
   coat.add_input<decl::Float>("Coat Roughness"_ustr)
       .default_value(0.03f)
       .min(0.0f)
@@ -154,24 +150,24 @@ static void node_declare(NodeDeclarationBuilder &b)
       .subtype(PROP_FACTOR)
       .short_label("Roughness"_ustr)
       .description("Roughness of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_ROUGHNESS_ID 19
+#define TOON_SURFACE_SOCK_COAT_ROUGHNESS_ID 18
   coat.add_input<decl::Float>("Coat IOR"_ustr)
       .default_value(1.5f)
       .min(1.0f)
       .max(4.0f)
       .short_label("IOR"_ustr)
       .description("Index of refraction of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_IOR_ID 20
+#define TOON_SURFACE_SOCK_COAT_IOR_ID 19
   coat.add_input<decl::Color>("Coat Tint"_ustr)
       .default_value({1.0f, 1.0f, 1.0f, 1.0f})
       .short_label("Tint"_ustr)
       .description("Absorption tint of the coat layer");
-#define TOON_SURFACE_SOCK_COAT_TINT_ID 21
+#define TOON_SURFACE_SOCK_COAT_TINT_ID 20
   coat.add_input<decl::Vector>("Coat Normal"_ustr).short_label("Normal"_ustr).hide_value();
-#define TOON_SURFACE_SOCK_COAT_NORMAL_ID 22
+#define TOON_SURFACE_SOCK_COAT_NORMAL_ID 21
 
   b.add_input<decl::Int>("LightIndex"_ustr).available(is_gpu_internal);
-#define TOON_SURFACE_SOCK_LIGHT_INDEX_ID 23
+#define TOON_SURFACE_SOCK_LIGHT_INDEX_ID 22
 }
 
 static void node_shader_init_toon_surface(bNodeTree * /*ntree*/, bNode *node)
@@ -221,15 +217,7 @@ static int node_shader_gpu_bsdf_toon_surface(GPUMaterial *mat,
   lookup_sampler.extend_x = GPU_SAMPLER_EXTEND_MODE_EXTEND;
   lookup_sampler.extend_yz = GPU_SAMPLER_EXTEND_MODE_EXTEND;
 
-  GPUNodeLink *diffuse_color = nullptr;
-  if (!GPU_link(mat,
-                "toon_surface_diffuse_color",
-                ensure_link(in[TOON_SURFACE_SOCK_BASE_COLOR_ID]),
-                ensure_link(in[TOON_SURFACE_SOCK_DIFFUSE_TEXTURE_ID]),
-                &diffuse_color))
-  {
-    return false;
-  }
+  GPUNodeLink *diffuse_color = ensure_link(in[TOON_SURFACE_SOCK_BASE_COLOR_ID]);
 
   if (diffuse_lut_image) {
     GPUNodeLink *lut_color = nullptr;
